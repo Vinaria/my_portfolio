@@ -8,7 +8,7 @@
 
 ## Дополнительные курсы
 1. Современный NLP. Большие языковые модели от VK Education (весна 2024г)
-   - телеграм-бот с генеративной моделью на основе StatLLM и ChatGPT https://github.com/Vinaria/mail_ru_llm_funtikova_anastasia
+   - телеграм-бот с генеративной моделью на основе StatLM и ChatGPT https://github.com/Vinaria/mail_ru_llm_funtikova_anastasia
 
 
 ## Отдельные проекты
