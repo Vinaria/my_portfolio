@@ -1,0 +1,79 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+library(PerformanceAnalytics)
+```
+
+
+```{r}
+asset <- read.table("Asset.csv",header=TRUE,sep=';',row.names = 1)
+imoex <- read.table("IMOEX.csv",header=TRUE,sep=';',row.names = 1)
+colnames(asset)<- c("NORNIKEL")
+colnames(imoex)<- c("IMOEX")
+asset$NORNIKEL <- as.numeric(asset$NORNIKEL)
+imoex$IMOEX <- as.numeric(imoex$IMOEX)
+row.names(asset) <- as.character(as.Date(rownames(asset),"%y%m%d"))
+row.names(imoex) <- as.character(as.Date(rownames(imoex),"%d.%m.%Y"))
+```
+
+```{r}
+
+plot(asset$NORNIKEL,type = 'b',main="NORNIKEL daily",pch = 21, col = "green",lwd = 2,xlab= 'data',ylab = "price" )
+```
+```{r}
+colnames(imoex)<- c("IMOEX")
+plot(imoex$IMOEX, type = 'b', main="Index MOEX daily", pch = 21, col = "green",lwd = 2,xlab= 'data',ylab = "index" )
+```
+
+```{r}
+Rf <-0.04
+
+
+len<-  dim(asset)[1]
+r1 <- diff(log(asset$NORNIKEL))
+r2 <- diff(log(imoex$IMOEX))
+rates <- cbind(r1,r2)
+
+
+colnames(rates)<- c("NORNIKEL","IMOEX")
+rownames(rates)<-rownames(asset)[2:len]
+head(rates)
+```
+
+```{r}
+beta <- CAPM.beta(rates[, "NORNIKEL"],rates[, "IMOEX"])
+beta
+```
+
+```{r}
+alpha <- CAPM.alpha(rates[, "NORNIKEL"],rates[, "IMOEX"],Rf = Rf)
+alpha
+```
+```{r}
+SharpeRatio(rates[, "NORNIKEL"], Rf = Rf, p = 0.95, FUN = c("StdDev"))
+```
+
+```{r}
+dif <- diff(asset[, 1])
+mean_dif <- mean(dif)
+vol <- sd(dif)
+alpha = 0.95
+```
+
+```{r}
+VaR(rates[, 'NORNIKEL'], p=.95, method="gaussian")
+```
+
+```{r}
+VaR(rates[, 'NORNIKEL'], p=.95, method="historical")
+```
+
+```{r}
+ES(rates[, 'NORNIKEL'], p=.95, method="historical")
+```
+
+```{r}
+ES(rates[, 'NORNIKEL'], p=.95, method="gaussian")
+```
