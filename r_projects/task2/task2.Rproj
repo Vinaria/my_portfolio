@@ -1,0 +1,10 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+asset <- read.table("Asset.csv",header=TRUE,sep=';',row.names = 1)
+imoex <- read.table("IMOEX.csv",header=TRUE,sep=';',row.names = 1)
+
+```
+
