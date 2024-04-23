@@ -1,0 +1,217 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(copula)
+```
+
+```{r}
+data <- readRDS('var_25.rds')
+names(data)
+```
+
+```{r}
+plot(data$predictor,data$output,main = 'predictor vs output', col = 'green',pch = 20,xlab = 'predictor', ylab = 'output')
+```
+
+```{r}
+pred_out <- cbind(data$predictor,data$output)
+e_cop <-pobs(pred_out)
+plot(e_cop[,1],e_cop[,2],pch = 21,main ="pobs(Predictor vs Output) ",col = "blue")
+```
+
+```{r}
+#Normal copula
+  normal_copula<-normalCopula(param=0,dim=2)
+#Student copula
+  t_copula <-ellipCopula(family = "t",param = 0,dim = 2)
+#Frank copula
+  Frank_copula<-frankCopula(param=5,dim=2)
+#Clayton
+  Clayton_copula<-claytonCopula(param=5,dim=2)
+```
+
+```{r}
+persp(normal_copula, dCopula, main="pdf",xlab="u", ylab="v", zlab="c(u,v)")
+```
+
+```{r}
+persp(t_copula, dCopula, main="pdf",xlab="u", ylab="v", zlab="c(u,v)")
+```
+
+```{r}
+persp(Frank_copula, dCopula, main="pdf",xlab="u", ylab="v", zlab="c(u,v)")
+```
+
+```{r}
+persp(Clayton_copula, dCopula, main="pdf",xlab="u", ylab="v", zlab="c(u,v)")
+```
+
+```{r}
+my.normal_copula.fit<-fitCopula(normal_copula,
+                               e_cop,
+                               method = "ml",
+                               optim.method = "BFGS",
+                               optim.control = list(maxit=1000))
+
+normal_parameters <- my.normal_copula.fit@copula@parameters
+normal_parameters
+my.normal_copula.fit@loglik
+```
+
+```{r}
+my.t_copula.fit<-fitCopula(t_copula,
+                               e_cop,
+                               method = "ml",
+                               optim.method = "BFGS",
+                               optim.control = list(maxit=1000))
+
+t_parameters <- my.t_copula.fit@copula@parameters
+t_parameters
+my.t_copula.fit@loglik
+```
+
+```{r}
+my.Frank_copula.fit<-fitCopula(Frank_copula,
+                               e_cop,
+                               method = "ml",
+                               optim.method = "BFGS",
+                               optim.control = list(maxit=1000))
+
+frank_parameters <- my.Frank_copula.fit@copula@parameters
+frank_parameters
+my.Frank_copula.fit@loglik
+```
+
+```{r}
+my.Clayton_copula.fit<-fitCopula(Clayton_copula,
+                               e_cop,
+                               method = "ml",
+                               optim.method = "BFGS",
+                               optim.control = list(maxit=1000))
+
+clayton_parameters <- my.Clayton_copula.fit@copula@parameters
+clayton_parameters
+my.Clayton_copula.fit@loglik
+```
+
+```{r}
+best_parameters <- clayton_parameters
+best_copula <- Clayton_copula
+```
+
+
+```{r}
+best_copula@parameters<-best_parameters
+persp(best_copula, dCopula, xlab="u", ylab="v", zlab="c(u,v)")
+```
+
+```{r}
+contour(best_copula,dCopula, main="pdf",xlab="u", ylab="v")
+```
+
+```{r}
+data$predictor_DistrType
+```
+
+```{r}
+data$predictor_DistrParameters
+```
+
+```{r}
+data$output_DistrType
+```
+
+```{r}
+data$output_DistrParameters
+```
+
+```{r}
+predictor.copula <- pnorm(data$predictor,mean =  data$predictor_DistrParameters[1],sd=data$predictor_DistrParameters[2])
+output.copula <- plogis(data$output,data$output_DistrParameters[1], data$output_DistrParameters[2])
+```
+
+```{r}
+plot(predictor.copula, output.copula, main = 'predictor vs output. Marginal Distribution Copula', col = 'green',pch = 20,xlab = 'predictor', ylab = 'output')
+```
+
+
+```{r}
+quantileLevel <- function(numCopula,copula,theta,alpha)
+{
+  if (numCopula == 1)
+  {
+    #Gaussian
+    q <- pnorm(qnorm(alpha) *sqrt(1-theta*theta)  + theta* qnorm(copula[,1]))
+  }
+  if (numCopula == 2)
+  {
+    #Student
+    q <- pt(qt(alpha,theta[2]+1)*sqrt((theta[2]+(qt(copula[,1],theta[2]))**2)*(1-(theta[1])**2)/(theta[2]+1)) +
+       theta[1]*qt(copula[,1],theta[2]), theta[2])
+  }
+  if (numCopula == 3)
+  {
+    #Frank
+    q <- (-1/theta * log(1-alpha*(1-exp(-theta))/(exp(-theta*copula[,1])+alpha*(1 - exp(-theta*copula[,1])))))
+  }
+  if (numCopula == 4)
+  {
+    #Clayton
+    q <- ((alpha^(-theta/(1 + theta)) - 1) * (copula[,1]^(-theta)) + 1)^(-1/theta)
+  }
+  return(q)
+}
+copula <- cbind(predictor.copula, output.copula)
+alpha <- 0.95
+copulanum <- 4
+parameters <- clayton_parameters
+quantile <- quantileLevel(copulanum, copula, parameters, alpha)
+```
+
+```{r}
+(anomalindex <- which(copula[,2]>quantile))
+```
+
+```{r}
+plot(copula[,1],copula[,2],pch =20,col = "blue",main = "quatile level 95%")
+points(copula[,1],quantile,col = "green",pch = 20)
+points(copula[anomalindex,1],copula[anomalindex,2],col = "magenta",pch = 20)
+```
+
+```{r}
+anomal_predictor <- data$predictor[anomalindex]
+anomal_output    <- data$output[anomalindex]
+head(anomal_predictor)
+```
+
+```{r}
+head(anomal_output)
+```
+
+```{r}
+plot(data$predictor,data$output,main = 'predictor vs output', col = 'green',pch = 20,xlab = 'predictor', ylab = 'output')
+points(data$predictor[anomalindex],data$output[anomalindex],col = "magenta",pch = 20)
+```
+
+```{r}
+variant <- 25
+copulaNames <- c("normal", "student", "frank", "clayton")
+copulaName <-copulaNames[copulanum]
+copulaName
+```
+
+```{r}
+myResult <- list(variant = variant,
+                 copulaName = copulaName,
+                 predictor.copula = predictor.copula,
+                 output.copula = output.copula,  
+                 best_parameters = best_parameters,
+                 anomal_predictor= anomal_predictor,
+                 anomal_output= anomal_output)
+
+saveRDS(myResult,"result.rds")
+```
+

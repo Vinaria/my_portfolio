@@ -1,0 +1,56 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+sample <- read.table('var_25.csv', header = TRUE, sep = ",")
+sample<-data.frame(Output=sample$Output,Treatment=as.factor(sample$Treatment))
+```
+
+```{r}
+plot(Output~Treatment, data=sample)
+```
+
+```{r}
+g <- lm(Output~Treatment, data=sample)
+anova(g)
+```
+
+Внутрегрупповая сумма квадратов.
+```{r}
+(anovag_Sum_Sq_2 <- anova(g)$"Sum Sq"[2])
+```
+
+Межгрупповая сумма квадратов.
+```{r}
+(anovag_Sum_Sq_1 <- anova(g)$"Sum Sq"[1])
+```
+
+Гипотеза о равенстве групповых средних.
+```{r}
+(anovag_PValue<- anova(g)$"Pr(>F)"[1])
+```
+
+```{r}
+gi <- lm(Output ~ Treatment - 1, data=sample)
+anova(gi)
+```
+
+Сумма квадратов для предиктора для проверки гипотезы $H_0$:
+ “все групповые средние равны нулю”.
+```{r}
+ (anovamgi_Sum_Sq_1 <- anova(gi)$"Sum Sq"[1])
+```
+
+Сумма квадратов остатков для проверки этой же гипотезы $H_0$:
+ “все групповый средние равны нулю”.
+```{r}
+(anovagi_Sum_Sq_2<- anova(gi)$"Sum Sq"[2])
+```
+
+Гипотеза о равенстве всех групповых средних нулю.
+```{r}
+(anovagi_PValue <- anova(gi)$"Pr(>F)"[1])
+```
+
