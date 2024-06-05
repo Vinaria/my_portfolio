@@ -1,0 +1,211 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+На языке Python импортируем исторические цены закрытия проводятся из пакета yfinance начиная с 2022-01-01 по текущее время. Сохраним данные в csv файл.
+
+```
+import pandas as pd
+import yfinance as yf
+import time
+
+start_day = '2022-01-01'
+assetList = ['BXP','C','CAG','CAH','CARR','CAT','CB', 'CBOE', 'CBRE', 'CCI']
+
+def get_One_Asset(company,start_day):
+    df = pd.DataFrame()
+    returns = yf.Ticker(company)
+    data = returns.history(period="1y",start=start_day)
+    df.index=data.index
+    df[company]=data.Close
+    return df
+  
+data = pd.DataFrame() 
+for company in assetList:
+    asset = get_One_Asset(company,start_day)
+    data = pd.concat([data,asset],axis = 1)
+
+filename = 'myData.csv'
+data.to_csv(filename, index=True)
+```
+
+Подключим необходимые библиотеки.
+
+```{r}
+library(xts)
+library(quadprog)
+library(fPortfolio)
+```
+
+Считываем импортированные данные. На будущее запомним размеры датасета.
+
+```{r}
+data <- read.csv('myData.csv',header = TRUE)
+(nAsset <- dim(data)[2])
+(nDays <- dim(data)[1])
+```
+Меняем тип первого столбца на `Date`.
+
+```{r}
+Dates <- data[,1]
+Dates <- as.Date(Dates, "%Y-%m-%d")
+head(Dates)
+```
+
+Убираем первый столбец c датами остальные переводим в тип xts( time series).
+
+```{r}
+histData <- data[2:nAsset]
+sample.xts <- as.xts(histData, order.by = Dates)
+head(sample.xts)
+```
+
+Выделим 5 последних дат на проверку результата, а первые nDays-5 оставим на построение портфеля.
+
+```{r}
+Lag <- 5
+(testData <- sample.xts[(nDays-Lag):nDays,])
+sample.xts <- sample.xts[1:(nDays-Lag),] 
+(nDays <- nDays - Lag)
+```
+
+Нормируем данные и изобразим их на графике.
+
+```{r}
+std_data <- scale(sample.xts)
+plot(std_data,lty=1,main='Normalized assests',type = "l")
+```
+Переходим к рядам из геометрических доходностей. Уберем в них первую строку.
+
+```{r}
+stock.returns <- returns(sample.xts,method = 'discrete')
+head(stock.returns)
+stock.returns <- stock.returns[2:nDays,] 
+print('_________________________________________________________________________________________________')
+head(stock.returns)
+```
+
+Изобразим геометрические доходности на графике.
+
+```{r}
+matplot(stock.returns,lty=1,main='Asset Returns',type = "l")
+```
+
+Считаем ковариационную матрицу доходностей.
+
+```{r}
+(cov <- cov(stock.returns))
+```
+Зададим матрицу `Amat` и вектор `bvec` ограничений.
+
+```{r}
+n <- ncol(cov)
+Amat <- matrix (1, nrow=n)
+Amat <- cbind(Amat, -diag(n))
+meq <- 1
+bvec <- 1
+```
+
+Зададим ограничение.
+
+```{r}
+max.allocation <- 0.45
+bvec <- c(bvec, rep(-max.allocation, n))
+bvec
+```
+
+Зададим максимальную доходность и шаг изменения доходности и определим количество итераций цикла по доходности.
+
+```{r}
+risk.premium.up <-0.5
+risk.increment <- 0.01
+(loops <- risk.premium.up / risk.increment + 1)
+```
+
+Инициализируем матрицу, где будем хранить оптимальные портфели и различные статистики и заполним ее.
+
+```{r}
+eff <- matrix(nrow=loops, ncol=n+3)
+colnames(eff) <- c(colnames(stock.returns), "Std.Dev", "Exp.Return", "sharpe")
+
+mu <- colMeans(stock.returns)
+
+loop <- 1
+
+for (i in seq(from=0, to=risk.premium.up, by=risk.increment)){
+    dvec <- mu * i 
+    sol <- solve.QP(cov, dvec=dvec, Amat=Amat, bvec=bvec, meq=meq)
+    eff[loop,"Std.Dev"] <- sqrt(sum(sol$solution *colSums((cov * sol$solution))))
+    eff[loop,"Exp.Return"] <- as.numeric(sol$solution %*% colMeans(stock.returns))
+    eff[loop,"sharpe"] <- eff[loop,"Exp.Return"] / eff[loop,"Std.Dev"]
+    eff[loop,1:n] <- sol$solution
+    loop <- loop+1
+}
+eff <- as.data.frame(eff)
+head(eff)
+```
+
+Определяем точку, где коэффициент Шарпа максимален.
+
+```{r}
+eff.optimal.point <- eff[eff$sharpe==max(eff$sharpe),]
+
+plot(eff$Std.Dev,eff$Exp.Return,type = 'b',pch =21,col = 'green',lwd = 2)
+points(eff.optimal.point$Std.Dev,eff.optimal.point$Exp.Return,pch = 20,col = 'red',lwd = 4)
+text(eff.optimal.point$Std.Dev,eff.optimal.point$Exp.Return-0.0005,paste('Sharpe',round(eff.optimal.point$sharpe,3)))
+text(eff.optimal.point$Std.Dev,eff.optimal.point$Exp.Return-0.0008,paste('Std.Dev',round(eff.optimal.point$Std.Dev,3)))
+text(eff.optimal.point$Std.Dev,eff.optimal.point$Exp.Return-0.0011,paste('Return',round(eff.optimal.point$Exp.Return,3)))
+```
+
+Оптимальный портфель по Марковитцу.
+
+```{r}
+eff.optimal.point
+```
+
+Предположим у нас 1000000 долларов. Разделим их на доли вложения в каждый актив. Для этого нормируем оптимальный портфель так, чтобы сумма модулей была равна 1. Проверим, что наша нормализация сработала.
+
+```{r}
+eff.optimal.point<-eff.optimal.point[1:nAsset - 1]
+sabs <- sum(abs(eff.optimal.point))
+norm_eff.optimal.point <- eff.optimal.point/sabs
+sum(abs(norm_eff.optimal.point))
+```
+
+Поделим весь капитал на долю вложения на каждый актив.
+
+```{r}
+N <- 1000000
+(d_money <- norm_eff.optimal.point*N)
+```
+
+В итоге посмотрим на портфель на следующий интервал времени в количестве акций на последний день тренировочной выборки.
+
+```{r}
+nData <- dim(sample.xts)[1]
+(portfolio <- as.integer (d_money / histData[nData,]))  
+```
+
+Вычислим стоимость портфеля на момент создания с учетом округлений.
+
+```{r}
+sum(abs(portfolio)*histData[nData,])
+```
+
+Посмотрим на стоимость нашего портфеля по тестовым 5 дням.
+
+```{r}
+res <- rep(0,Lag)
+for (i in 1 : Lag)
+{
+  change <- histData[nData+i,]-histData[nData,]    
+  res[i]<-sum(portfolio*change)
+  print(paste(Dates[nData+i],' ',res[i]))  
+}    
+```
+
+```{r}
+plot(Dates[(nData+1):(nData+Lag)], res,main='Cumulative P&L',type="b",col = 'blue',pch=16)
+```
+
