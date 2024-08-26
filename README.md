@@ -9,7 +9,7 @@
    - [телеграм-бот с генеративной моделью на основе StatLM и ChatGPT](https://github.com/Vinaria/mail_ru_llm_funtikova_anastasia)
    - [сертификат о прохождении]([https://github.com/Vinaria/my_portfolio/certificates/vk_ed.pdf)
 - Летняя школа Яндекса для аналитиков-разрабочиков
-  - [сертификат о прохождении]
+  - [сертификат о прохождении](https://github.com/Vinaria/my_portfolio/blob/main/certificates/ШАР.pdf)
 
 
 ## Отдельные проекты
